@@ -16,7 +16,7 @@ load_dotenv()
 
 from models_config import get_all_models, get_model_by_id
 from providers import call_friendli, call_openai, ProviderError
-from comet_logger import log_benchmark_run
+from quality_evaluator import evaluate_response_quality
 
 app = FastAPI(title="LLM Benchmark API")
 
@@ -43,6 +43,7 @@ class BenchmarkResult(BaseModel):
     tokens_estimate: int
     estimated_cost_usd: float
     text: str
+    quality_score: Optional[float] = None
     error: Optional[str] = None
 
 
@@ -115,15 +116,37 @@ async def benchmark(request: BenchmarkRequest):
         
         end_time = time.time()
         latency_ms = (end_time - start_time) * 1000.0
+        latency_seconds = (end_time - start_time)
         
         # Estimate tokens: approximate as ceil((prompt_length + output_length) / 4.0)
         if error is None:
-            total_chars = len(request.prompt) + len(text)
-            tokens_estimate = math.ceil(total_chars / 4.0)
-            estimated_cost_usd = (tokens_estimate / 1000.0) * model["price_per_1k_tokens_usd"]
+            input_chars = len(request.prompt)
+            output_chars = len(text)
+            input_tokens_estimate = math.ceil(input_chars / 4.0)
+            output_tokens_estimate = math.ceil(output_chars / 4.0)
+            total_tokens_estimate = input_tokens_estimate + output_tokens_estimate
+            
+            # Calculate cost based on pricing type
+            pricing_type = model.get("pricing_type", "per_token")
+            
+            if pricing_type == "per_second":
+                # Per-second pricing: cost = latency_seconds * price_per_second
+                estimated_cost_usd = latency_seconds * model.get("price_per_second_usd", 0.0)
+            elif pricing_type == "per_token_split":
+                # Split pricing: separate input and output rates
+                input_cost = (input_tokens_estimate / 1_000_000.0) * model.get("price_per_1M_input_tokens_usd", 0.0)
+                output_cost = (output_tokens_estimate / 1_000_000.0) * model.get("price_per_1M_output_tokens_usd", 0.0)
+                estimated_cost_usd = input_cost + output_cost
+            else:
+                # Default: per_token pricing
+                estimated_cost_usd = (total_tokens_estimate / 1_000_000.0) * model.get("price_per_1M_tokens_usd", 0.0)
+            
+            tokens_estimate = total_tokens_estimate
         else:
             tokens_estimate = 0
             estimated_cost_usd = 0.0
+            input_tokens_estimate = 0
+            output_tokens_estimate = 0
         
         results.append(
             BenchmarkResult(
@@ -134,40 +157,37 @@ async def benchmark(request: BenchmarkRequest):
                 tokens_estimate=tokens_estimate,
                 estimated_cost_usd=estimated_cost_usd,
                 text=text,
+                quality_score=None,  # Will be evaluated after all responses are collected
                 error=error,
             )
         )
     
-    # Determine winner (lowest cost, tie-break by latency)
+    # Evaluate quality for all successful responses
+    for result in results:
+        if result.error is None and result.text:
+            try:
+                result.quality_score = await evaluate_response_quality(request.prompt, result.text)
+            except Exception as e:
+                print(f"Warning: Failed to evaluate quality for {result.model_id}: {e}")
+                result.quality_score = None
+    
+    # Determine winner (lowest cost, tie-break by latency, then quality)
     successful_results = [r for r in results if r.error is None]
     winner = None
     winner_reason = None
     
     if successful_results:
-        # Sort by cost (ascending), then latency (ascending)
+        # Sort by cost (ascending), then latency (ascending), then quality (descending)
         sorted_results = sorted(
             successful_results,
-            key=lambda x: (x.estimated_cost_usd, x.latency_ms)
+            key=lambda x: (
+                x.estimated_cost_usd,
+                x.latency_ms,
+                -(x.quality_score or 0)  # Negative for descending quality
+            )
         )
         winner = sorted_results[0].model_id
-        winner_reason = "lowest estimated cost, tie-broken by latency"
-    
-    # Log to Comet ML (fire-and-forget)
-    try:
-        results_dict = [
-            {
-                "model_id": r.model_id,
-                "latency_ms": r.latency_ms,
-                "estimated_cost_usd": r.estimated_cost_usd,
-                "tokens_estimate": r.tokens_estimate,
-                "error": r.error,
-            }
-            for r in results
-        ]
-        log_benchmark_run(request.prompt, results_dict, winner)
-    except Exception as e:
-        # Don't fail the request if logging fails
-        print(f"Warning: Failed to log to Comet: {e}")
+        winner_reason = "lowest estimated cost, tie-broken by latency, then quality"
     
     return BenchmarkResponse(
         prompt=request.prompt,

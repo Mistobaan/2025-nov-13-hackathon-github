@@ -3,47 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Cost & Latency Benchmark</title>
+    <title>Model Select - Find the Best Model for Your Prompt</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>LLM Cost & Latency Benchmark</h1>
+        <header>
+            <h1>Model Select</h1>
+            <p class="subtitle">Find the best model for your prompt</p>
+        </header>
         
-        <div class="form-section">
-            <label for="promptInput">Prompt:</label>
-            <textarea id="promptInput" rows="5" placeholder="Enter your prompt here..."></textarea>
-        </div>
-        
-        <div class="form-section">
-            <label>Select Models:</label>
-            <div id="modelCheckboxes"></div>
-        </div>
-        
-        <div class="form-section">
-            <button id="runButton">Run Benchmark</button>
-            <div id="statusText"></div>
+        <div class="form-card">
+            <div class="form-section">
+                <label for="promptInput">Prompt</label>
+                <textarea id="promptInput" rows="4" placeholder="Enter your prompt here..."></textarea>
+            </div>
+            
+            <div class="form-section">
+                <label>Select Models</label>
+                <div id="modelCheckboxes" class="model-grid"></div>
+            </div>
+            
+            <div class="form-section">
+                <button id="runButton" class="primary-button">
+                    <span id="buttonText">Run Benchmark</span>
+                </button>
+                <div id="statusText" class="status-text"></div>
+            </div>
+            
+            <!-- Chronometer -->
+            <div id="chronometer" class="chronometer" style="display: none;">
+                <div class="chronometer-label">Elapsed Time</div>
+                <div class="chronometer-time" id="chronometerTime">0.00s</div>
+            </div>
         </div>
         
         <div id="resultsSection" style="display: none;">
-            <div id="winnerInfo"></div>
+            <div id="winnerInfo" class="winner-card"></div>
             
-            <table id="resultsTable">
-                <thead>
-                    <tr>
-                        <th>Model</th>
-                        <th>Provider</th>
-                        <th>Latency (ms)</th>
-                        <th>Est. Cost (USD)</th>
-                        <th>Tokens</th>
-                        <th>Winner?</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsTableBody">
-                </tbody>
-            </table>
+            <!-- Charts Section -->
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Latency Comparison</h3>
+                    <canvas id="latencyChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Cost Comparison</h3>
+                    <canvas id="costChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Quality Score</h3>
+                    <canvas id="qualityChart"></canvas>
+                </div>
+            </div>
             
-            <div id="responseTexts"></div>
+            <!-- Results Table -->
+            <div class="table-card">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Provider</th>
+                            <th>Latency</th>
+                            <th>Cost</th>
+                            <th>Tokens</th>
+                            <th>Quality</th>
+                            <th>Winner</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Response Texts -->
+            <div id="responseTexts" class="responses-container"></div>
         </div>
     </div>
     
