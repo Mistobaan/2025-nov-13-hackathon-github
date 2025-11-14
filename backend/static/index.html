@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Cost & Latency Benchmark</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Cost & Latency Benchmark</h1>
+        
+        <div class="form-section">
+            <label for="promptInput">Prompt:</label>
+            <textarea id="promptInput" rows="5" placeholder="Enter your prompt here..."></textarea>
+        </div>
+        
+        <div class="form-section">
+            <label>Select Models:</label>
+            <div id="modelCheckboxes"></div>
+        </div>
+        
+        <div class="form-section">
+            <button id="runButton">Run Benchmark</button>
+            <div id="statusText"></div>
+        </div>
+        
+        <div id="resultsSection" style="display: none;">
+            <div id="winnerInfo"></div>
+            
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Provider</th>
+                        <th>Latency (ms)</th>
+                        <th>Est. Cost (USD)</th>
+                        <th>Tokens</th>
+                        <th>Winner?</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                </tbody>
+            </table>
+            
+            <div id="responseTexts"></div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
+
